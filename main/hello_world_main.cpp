@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 
-
 #include <stdio.h>
 #include <cmath>
 #include <stdlib.h>
@@ -22,25 +21,28 @@
 #define TAG "BADGE"
 
 // --- LGFX config custom (garde ta config) ---
-class LGFX : public lgfx::LGFX_Device {
+class LGFX : public lgfx::LGFX_Device
+{
   lgfx::Panel_ILI9341 _panel_instance;
   lgfx::Bus_SPI _bus_instance;
   lgfx::Light_PWM _light_instance;
+
 public:
-  LGFX(void) {
+  LGFX(void)
+  {
     {
       auto cfg = _bus_instance.config();
       cfg.spi_host = HSPI_HOST;
       cfg.spi_mode = 0;
       cfg.freq_write = 40000000;
-      cfg.freq_read  = 16000000;
+      cfg.freq_read = 16000000;
       cfg.spi_3wire = false;
       cfg.use_lock = true;
       cfg.dma_channel = SPI_DMA_CH_AUTO;
       cfg.pin_sclk = 14;
       cfg.pin_mosi = 13;
       cfg.pin_miso = 12;
-      cfg.pin_dc   = 2;
+      cfg.pin_dc = 2;
       _bus_instance.config(cfg);
       _panel_instance.setBus(&_bus_instance);
     }
@@ -69,7 +71,7 @@ public:
       auto cfg = _light_instance.config();
       cfg.pin_bl = 21;
       cfg.invert = false;
-      cfg.freq   = 44100;
+      cfg.freq = 44100;
       cfg.pwm_channel = 7;
       _light_instance.config(cfg);
       _panel_instance.setLight(&_light_instance);
@@ -89,7 +91,12 @@ int screenW, screenH;
 LGFX_Sprite spr(&lcd);
 
 // Timing animation
-// Glitch désactivé
+float t = 0.0f;
+// Variables pour l'effet de scintillement organique
+float neon_flicker = 1.0f;
+float neon_flicker_smooth = 1.0f; // Ajout pour le lissage
+int neon_dim_frames = 0;
+float neon_dim_target = 1.0f;
 
 // Colors (neon-ish)
 uint16_t colBackground;
@@ -108,13 +115,6 @@ int anim_glow_direction = 1;
 void drawScanlines();
 void drawNameWithGlow(const char *name1, const char *name2);
 void drawLikeCounter();
-void drawStringGlowed(const char *str, int x, int y, int offset) {
-  // Dessine le texte avec un effet glow (néon)
-  spr.drawString(str, x + 1 + offset, y + 1 + offset);
-  spr.drawString(str, x - 1 - offset, y + 1 + offset);
-  spr.drawString(str, x + 1 + offset, y - 1 - offset);
-  spr.drawString(str, x - 1 - offset, y - 1 - offset);
-}
 
 void display_loop_task(void *pvParameter);
 extern "C" void app_main(void)
@@ -128,11 +128,11 @@ extern "C" void app_main(void)
   screenH = lcd.height();
 
   // Colors
-  colBackground   = lcd.color565(8, 6, 20);
-  colNeonViolet   = lcd.color565(199, 120, 255);
-  colCyan         = lcd.color565(0, 224, 255);
-  colYellow       = lcd.color565(255, 195, 0);
-  colHeart        = lcd.color565(255, 40, 180);
+  colBackground = lcd.color565(8, 6, 20);
+  colNeonViolet = lcd.color565(199, 120, 255);
+  colCyan = lcd.color565(0, 224, 255);
+  colYellow = lcd.color565(255, 195, 0);
+  colHeart = lcd.color565(255, 40, 180);
 
   // Touch init désactivé
 
@@ -154,140 +154,163 @@ extern "C" void app_main(void)
 }
 
 // Tâche d'affichage à 60 fps
-void display_loop_task(void *pvParameter) {
+void display_loop_task(void *pvParameter)
+{
   const TickType_t frame_delay = pdMS_TO_TICKS(16); // 60 fps = 16 ms
   unsigned long lastFrame = 0;
-  while (true) {
+  while (true)
+  {
     unsigned long now = lgfx::v1::millis();
-    if (now - lastFrame < 16) {
+    if (now - lastFrame < 16)
+    {
       vTaskDelay(1 / portTICK_PERIOD_MS);
       continue;
     }
     lastFrame = now;
 
-  // Animation scanlines
-  scanline_offset = (scanline_offset + 1) % 10;
-  // Animation glow progressive
-  anim_glow_level += anim_glow_direction;
-  if (anim_glow_level > 6) {
-    anim_glow_level = 6;
-    anim_glow_direction = -1;
-  }
-  if (anim_glow_level < -24) {
-    anim_glow_level = -24;
-    anim_glow_direction = 1;
-  }
-  spr.fillSprite(colBackground);
-  drawScanlines();
-  // Header "TAP TO LIKE"
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(2);
-  spr.setTextColor(colCyan);
-  spr.drawString("TAP TO LIKE", screenW/2, 20);
-  // Heart
-  spr.fillCircle(screenW/2, 54, 16, colHeart);
-  // Nom avec glow sur deux lignes (animation)
-  drawNameWithGlow("YANN", "SERGENT");
-  // Séparateur
-  spr.fillRect(36, 180, screenW - 80, 3, colCyan);
-  // Team
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(2);
-  spr.setTextColor(colCyan);
-  spr.drawString("open|core", screenW/2, 200);
-  // Ville + rôle
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(2);
-  spr.setTextColor(colYellow);
-  spr.drawString("LYON", screenW/2, 230);
-  spr.drawString("DEV FRONTEND", screenW/2, 260);
-  // Compteur likes
-  drawLikeCounter();
-  spr.pushSprite(0, 0);
-  vTaskDelay(frame_delay);
+    t = lgfx::v1::millis() * 0.001f;
+
+    // --- Animation néon organique ---
+    // Flicker rapide (variation frame à frame, plus intense)
+    float flicker_fast = 0.75f + 0.35f * ((float)rand() / RAND_MAX) * ((float)rand() / RAND_MAX); // plus de flicker, distribution non linéaire
+
+    // Baisse occasionnelle, moins fréquente et plus variable
+    if (neon_dim_frames <= 0 && ((float)rand() / RAND_MAX) < 0.016f)
+    {                                    // 1.6% de chance par frame
+      neon_dim_frames = 6 + rand() % 10; // durée entre 6 et 15 frames
+      // Baisse variable, parfois très légère, parfois plus marquée
+      float base_dim = 0.65f + 0.25f * ((float)rand() / RAND_MAX) * ((float)rand() / RAND_MAX); // entre 0.65 et 0.9, distribution non linéaire
+      neon_dim_target = base_dim;
+    }
+    if (neon_dim_frames > 0)
+    {
+      // La baisse elle-même varie à chaque frame
+      float frame_dim = neon_dim_target + 0.08f * (((float)rand() / RAND_MAX) - 0.5f); // petite variation
+      flicker_fast *= frame_dim;
+      neon_dim_frames--;
+    }
+    // --- Lissage du flicker ---
+    float smoothing = 0.72f; // Ajuste entre 0.7 et 0.95 pour plus ou moins de lissage
+    neon_flicker_smooth = smoothing * neon_flicker_smooth + (1.0f - smoothing) * flicker_fast;
+    neon_flicker = neon_flicker_smooth;
+
+    // Animation scanlines
+    scanline_offset = (scanline_offset + 1) % 10;
+
+    // Variation de la luminosité globale avec neon_flicker
+    int brightness = (int)(neon_flicker * 255.0f);
+    brightness = brightness < 32 ? 32 : (brightness > 255 ? 255 : brightness); // Clamp pour éviter écran trop sombre
+    lcd.setBrightness(brightness);
+
+    spr.fillSprite(colBackground);
+    drawScanlines();
+    // Header "TAP TO LIKE"
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextFont(1);
+    spr.setTextSize(2);
+    spr.setTextColor(colCyan);
+    spr.drawString("TAP TO LIKE", screenW / 2, 20);
+    // Heart
+    spr.fillCircle(screenW / 2, 54, 16, colHeart);
+    // Nom avec glow sur deux lignes (animation)
+    drawNameWithGlow("YANN", "SERGENT");
+    // Séparateur
+    spr.fillRect(36, 180, screenW - 80, 3, colCyan);
+    // Team
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextFont(1);
+    spr.setTextSize(2);
+    spr.setTextColor(colCyan);
+    spr.drawString("open|core", screenW / 2, 200);
+    // Ville + rôle
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextFont(1);
+    spr.setTextSize(2);
+    spr.setTextColor(colYellow);
+    spr.drawString("LYON", screenW / 2, 230);
+    spr.drawString("DEV FRONTEND", screenW / 2, 260);
+    // Compteur likes
+    drawLikeCounter();
+    spr.pushSprite(0, 0);
+    vTaskDelay(frame_delay);
   }
 }
 
 // --- Fonctions utilitaires ---
-void drawScanlines() {
-  for (int y = 0; y < screenH; y += 10) {
+void drawScanlines()
+{
+  for (int y = 0; y < screenH; y += 10)
+  {
     int animY = y + scanline_offset;
-    if (animY < screenH) {
+    if (animY < screenH)
+    {
       uint16_t col = lcd.color565(12, 8, 30);
       spr.drawFastHLine(0, animY, screenW, col);
     }
   }
 }
 
-void drawNameWithGlow(const char *name1, const char *name2) {
+void drawNeonText(const char *txt1, const char *txt2, int x, int y1, int y2)
+{
 
-  // Effet néon progressif
+  // Couleur de base du néon (rose/violet)
+  uint8_t baseR = 255;
+  uint8_t baseG = 60;
+  uint8_t baseB = 200;
+
+  // Flicker organique seul (sans pulse)
+  float flicker = neon_flicker;
+  float organic = flicker;
+  organic = fmaxf(organic, 0.32f); // ne descend jamais sous 0.32 (plus lumineux)
+
   spr.setTextDatum(MC_DATUM);
   spr.setTextFont(4);
-  int x = screenW/2;
-  int y1 = 110;
-  int y2 = 145;
 
-  if (anim_glow_level >= 5) {
-    // Glow 3
-    spr.setTextSize(1.8);
-    spr.setTextColor(lcd.color565(60, 0, 80));
-    drawStringGlowed(name1, x, y1, 4);
-  drawStringGlowed(name2, x, y2, 4);
+  // Halo : nombre de couches dépend dynamiquement du flicker
+  int layers = (int)(neon_flicker * 12.0f); // 0 à 12 couches selon l'intensité
+  for (int i = layers; i > 0; i--)
+  {
+    float fade = powf(0.8f, i) * organic;
+    float alpha = fade * 0.5f * flicker;
+    uint8_t r = (uint8_t)(baseR * alpha + 8 * (1.0f - alpha));
+    uint8_t g = (uint8_t)(baseG * alpha + 6 * (1.0f - alpha));
+    uint8_t b = (uint8_t)(baseB * alpha + 20 * (1.0f - alpha));
+    uint16_t color = lcd.color565(r, g, b);
+    spr.setTextColor(color);
+    spr.setTextSize(1.5f + 0.02f * i);
+    // Dessine les deux couches
+    spr.drawString(txt1, x + i, y1);
+    spr.drawString(txt1, x - i, y1);
+    spr.drawString(txt1, x, y1 + i);
+    spr.drawString(txt1, x, y1 - i);
+    spr.drawString(txt2, x + i, y2);
+    spr.drawString(txt2, x - i, y2);
+    spr.drawString(txt2, x, y2 + i);
+    spr.drawString(txt2, x, y2 - i);
   }
-  if (anim_glow_level >= 4) {
-    // Glow 3 base
-    spr.setTextSize(1.8);
-    spr.setTextColor(lcd.color565(60, 0, 80));
-    spr.drawString(name1, x, y1);
-    spr.drawString(name2, x, y2);
-    spr.setTextSize(1.7);
-    drawStringGlowed(name1, x, y1, 1);
-  drawStringGlowed(name2, x, y2, 1);
-  }
-  if (anim_glow_level >= 3) {
-    // Glow 2
-    spr.setTextSize(1.7);
-    spr.setTextColor(lcd.color565(140, 60, 200));
-    drawStringGlowed(name1, x, y1, 3);
-  drawStringGlowed(name2, x, y2, 3);
-  }
-  if (anim_glow_level >= 2) {
-    // Glow 2 base
-    spr.setTextSize(1.7);
-    spr.setTextColor(lcd.color565(140, 60, 200));
-   spr.drawString(name1, x, y1);
-    spr.drawString(name2, x, y2);
-    spr.setTextSize(1.6);
-    drawStringGlowed(name1, x, y1, 1);
-  drawStringGlowed(name2, x, y2, 1);
-  }
-  if (anim_glow_level >= 1) {
-    // Glow 1
-    spr.setTextSize(1.6);
-    spr.setTextColor(lcd.color565(255, 180, 255));
-    drawStringGlowed(name1, x, y1, 2);
-  drawStringGlowed(name2, x, y2, 2);
-  }
-  // Glow 1 base
-  spr.setTextColor(lcd.color565(255, 180, 255));
-  spr.setTextSize(1.5);
-  drawStringGlowed(name1, x, y1, 1);
-  drawStringGlowed(name2, x, y2, 1);
 
-  // Texte principal blanc
-  spr.setTextSize(1.5);
-  spr.setTextColor(lcd.color565(255, 255, 255));
-  spr.drawString(name1, x, y1);
-  spr.drawString(name2, x, y2);
-
+  // Texte principal plus vif pour les deux couches
+  spr.setTextSize(1.5f);
+  uint16_t brightColor = lcd.color565(
+      baseR * (0.3f + 0.6f * organic),
+      baseG * (0.3f + 0.6f * organic),
+      baseB * (0.3f + 0.6f * organic));
+  spr.setTextColor(brightColor);
+  spr.drawString(txt1, x, y1);
+  spr.drawString(txt2, x, y2);
 }
 
+void drawNameWithGlow(const char *name1, const char *name2)
+{
+  int x = screenW / 2;
+  int y1 = 110;
+  int y2 = 145;
+  // Dessine les deux noms avec effet glow en même temps
+  drawNeonText(name1, name2, x, y1, y2);
+}
 
-void drawLikeCounter() {
+void drawLikeCounter()
+{
   spr.setTextDatum(TR_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(2);
