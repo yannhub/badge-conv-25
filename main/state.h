@@ -2,6 +2,17 @@
 
 #include <cstdint>
 
+// Structure pour les particules flottantes
+struct Particle
+{
+    float x;
+    float y;
+    float speed;
+    float size;
+    float alpha;
+    float phase;
+};
+
 class AppState
 {
 public:
@@ -23,4 +34,16 @@ public:
     unsigned long neon_next_flicker = 0;
     bool neon_is_flickering = false;
     float neon_flicker_intensity = 1.0f;
+
+    // Variables pour les effets rétro-futuristes
+    float grid_offset = 0.0f;
+    float corner_pulse = 0.0f;
+    float border_pulse = 0.0f;
+    Particle particles[8];
+    bool particles_initialized = false;
+    unsigned long glitch_next = 0;
+    bool glitch_active = false;
+    unsigned long glitch_start = 0;
+    int glitch_offset_x = 0;
+    int glitch_offset_y = 0;
 };
