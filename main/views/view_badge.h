@@ -15,7 +15,6 @@ public:
     void updateScanlineOffset();
     void renderBackground(LGFX_Sprite &spr);
     void renderHeader(LGFX_Sprite &spr);
-    void renderHeart(LGFX_Sprite &spr);
     void renderName(LGFX_Sprite &spr);
     void renderSeparator(LGFX_Sprite &spr);
     void renderTeam(LGFX_Sprite &spr);
@@ -23,7 +22,6 @@ public:
     void renderScanlines(LGFX_Sprite &spr);
     void renderNeonText(LGFX_Sprite &spr, const char *txt1, const char *txt2, int x, int y1, int y2);
     void renderNeonFullName(LGFX_Sprite &spr, const char *name1, const char *name2);
-    void renderLikeCounter(LGFX_Sprite &spr);
 
     AppState &m_state;
     LGFX &m_lcd;

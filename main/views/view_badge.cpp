@@ -31,7 +31,7 @@ ViewBadge::ViewBadge(AppState &state, LGFX &lcd)
     : m_state(state), m_lcd(lcd)
 {
     // Initialiser le prochain clignotement
-    uint32_t random_delay = (esp_random() % 5000) + 5000; // 5-10 secondes
+    uint32_t random_delay = (esp_random() % 15000) + 5000; // 5-20 secondes
     m_state.neon_next_flicker = (esp_timer_get_time() / 1000ULL) + random_delay;
 }
 
@@ -83,8 +83,8 @@ void ViewBadge::updateNeonIntensity()
             // Fin du clignotement
             m_state.neon_is_flickering = false;
             m_state.neon_flicker_intensity = 1.0f;
-            // Planifier le prochain clignotement dans 5-10 secondes
-            uint32_t random_delay = (esp_random() % 5000) + 5000;
+            // Planifier le prochain clignotement dans 5-20 secondes
+            uint32_t random_delay = (esp_random() % 15000) + 5000;
             m_state.neon_next_flicker = now + random_delay;
         }
     }
@@ -121,12 +121,7 @@ void ViewBadge::renderHeader(LGFX_Sprite &spr)
     spr.setTextFont(1);
     spr.setTextSize(2);
     spr.setTextColor(colCyan);
-    spr.drawString("TAP TO LIKE", m_state.screenW / 2, 20);
-}
-
-void ViewBadge::renderHeart(LGFX_Sprite &spr)
-{
-    spr.fillCircle(m_state.screenW / 2, 54, 16, colHeart);
+    spr.drawString("100% G2S", m_state.screenW / 2, 20);
 }
 
 void ViewBadge::renderName(LGFX_Sprite &spr)
@@ -221,17 +216,6 @@ void ViewBadge::renderNeonFullName(LGFX_Sprite &spr, const char *name1, const ch
     renderNeonText(spr, name1, name2, x, y1, y2);
 }
 
-void ViewBadge::renderLikeCounter(LGFX_Sprite &spr)
-{
-    spr.setTextDatum(TR_DATUM);
-    spr.setTextFont(1);
-    spr.setTextSize(2);
-    spr.setTextColor(colHeart);
-    char buf[16];
-    snprintf(buf, sizeof(buf), "\xe2\x99\xa5 %d", m_state.likes);
-    spr.drawString(buf, m_state.screenW - 8, 8);
-}
-
 // Affichage principal du badge
 void ViewBadge::render(LGFX &display, LGFX_Sprite &spr)
 {
@@ -247,10 +231,8 @@ void ViewBadge::render(LGFX &display, LGFX_Sprite &spr)
     // Rendu
     renderBackground(spr);
     renderHeader(spr);
-    renderHeart(spr);
     renderName(spr);
     renderSeparator(spr);
     renderTeam(spr);
     renderLocationAndRole(spr);
-    renderLikeCounter(spr);
 }
