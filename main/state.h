@@ -19,14 +19,13 @@ class AppState
 {
 public:
     float t = 0.0f;
+    float dt = 0.016f; // Delta time (calculé globalement par DisplayManager)
     int screenW = 0;
     int screenH = 0;
     int touch_x = -1;
     int touch_y = -1;
 
     float scanline_offset = 0.0f;
-
-    unsigned long neon_last_update = 0;
 
     float corner_pulse = 0.0f;
     float border_pulse = 0.0f;

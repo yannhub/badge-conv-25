@@ -67,7 +67,7 @@ void ViewBadge::updateAnimations(float dt)
     m_state.corner_pulse += dt * 2.0f;
 
     // Pulsation des bordures
-    m_state.border_pulse += dt * 4.0f;
+    m_state.border_pulse += dt * 1.5f;
 
     // Animation du microprocesseur
     unsigned long now_ms = esp_timer_get_time() / 1000ULL;
@@ -200,7 +200,8 @@ void ViewBadge::updateAnimations(float dt)
 
 void ViewBadge::updateScanlineOffset()
 {
-    m_state.scanline_offset = fmodf(m_state.scanline_offset + 0.5f, 10.0f);
+    // Animation fluide basée sur dt (vitesse: 15 pixels par seconde)
+    m_state.scanline_offset = fmodf(m_state.scanline_offset + m_state.dt * 15.0f, 10.0f);
 }
 
 void ViewBadge::renderBackground(LGFX_Sprite &spr)
@@ -246,14 +247,12 @@ void ViewBadge::renderLocationAndRole(LGFX_Sprite &spr)
 
 void ViewBadge::renderScanlines(LGFX_Sprite &spr)
 {
+    // Dessiner les scanlines avec défilement fluide
+    uint16_t col = m_lcd.color565(12, 8, 30);
     for (int y = 0; y < m_state.screenH; y += 10)
     {
-        int animY = y + (int)m_state.scanline_offset;
-        if (animY < m_state.screenH)
-        {
-            uint16_t col = m_lcd.color565(12, 8, 30);
-            spr.drawFastHLine(0, animY, m_state.screenW, col);
-        }
+        int animY = (y + (int)m_state.scanline_offset) % m_state.screenH;
+        spr.drawFastHLine(0, animY, m_state.screenW, col);
     }
 }
 
@@ -285,17 +284,18 @@ void ViewBadge::renderCorners(LGFX_Sprite &spr)
 
 void ViewBadge::renderParticles(LGFX_Sprite &spr)
 {
-    for (int i = 0; i < 3; i++) // 3 particules
+    // Dessiner toutes les particules actives (jusqu'à 12)
+    for (int i = 0; i < 12; i++)
     {
-        // Ne dessiner que les particules actives
-        if (!m_state.particles[i].active)
+        // Ne dessiner que les particules actives avec alpha visible
+        if (!m_state.particles[i].active || m_state.particles[i].alpha < 0.05f)
             continue;
 
-        // Variantes de cyan et magenta uniquement
+        // Variantes de cyan uniquement
         uint8_t r, g, b;
 
-        // Alterner entre différentes nuances de cyan et magenta
-        int color_index = i % 2;
+        // Alterner entre différentes nuances de cyan
+        int color_index = i % 3;
         if (color_index == 0)
         {
             // Cyan pur brillant
@@ -318,8 +318,8 @@ void ViewBadge::renderParticles(LGFX_Sprite &spr)
             b = 200;
         }
 
-        // Appliquer l'alpha pour le fade in/out (garder la brillance)
-        float brightness = m_state.particles[i].alpha * 0.9f + 0.1f; // Minimum 10% pour rester visible
+        // Appliquer l'alpha pour le fade in/out
+        float brightness = m_state.particles[i].alpha;
         uint16_t particleColor = m_lcd.color565(
             r * brightness,
             g * brightness,
@@ -403,8 +403,8 @@ void ViewBadge::renderGeometricElements(LGFX_Sprite &spr)
     int lineY1 = 40;
 
     // Animation de longueur avec effet de vague (décalage de phase entre lignes)
-    float wave1 = sinf(m_state.border_pulse * 0.7f);
-    float wave2 = sinf(m_state.border_pulse * 0.7f + 1.57f); // Décalage de 90°
+    float wave1 = sinf(m_state.border_pulse * 0.5f);
+    float wave2 = sinf(m_state.border_pulse * 0.5f + 1.57f); // Décalage de 90°
 
     int baseLen = 25;
     int maxExtension = 20;
@@ -726,14 +726,8 @@ void ViewBadge::render(LGFX &display, LGFX_Sprite &spr)
     // Initialiser les particules si nécessaire
     initParticles();
 
-    // Calcul du delta time
-    float dt = 0.016f; // ~60fps par défaut
-    unsigned long now = esp_timer_get_time() / 1000ULL;
-    if (m_state.neon_last_update > 0)
-    {
-        dt = (now - m_state.neon_last_update) / 1000.0f;
-        dt = fminf(dt, 0.1f);
-    }
+    // Utiliser le delta time calculé globalement par DisplayManager
+    float dt = m_state.dt;
 
     // Mise à jour des animations
     updateScanlineOffset();

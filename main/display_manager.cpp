@@ -85,14 +85,33 @@ void DisplayManager::nextView()
 bool DisplayManager::shouldRenderFrame()
 {
     static unsigned long lastFrame = 0;
+    static bool firstFrame = true;
+
     unsigned long now = lgfx::v1::millis();
+
+    // Initialiser lors de la première frame
+    if (firstFrame)
+    {
+        lastFrame = now;
+        m_state.dt = 0.016f; // Valeur par défaut pour la première frame
+        m_state.t = now * 0.001f;
+        firstFrame = false;
+        return true;
+    }
+
     if (now - lastFrame < 16)
     {
         vTaskDelay(pdMS_TO_TICKS(1));
         return false;
     }
+
+    // Calculer le delta time
+    m_state.dt = (now - lastFrame) * 0.001f; // Convertir en secondes
+    if (m_state.dt > 0.1f)                   // Limiter pour éviter les sauts
+        m_state.dt = 0.1f;
+
     lastFrame = now;
-    m_state.t = lgfx::v1::millis() * 0.001f;
+    m_state.t = now * 0.001f;
     return true;
 }
 

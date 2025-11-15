@@ -93,12 +93,9 @@ void ViewGame::update(float dt)
     }
 
     unsigned long now = esp_timer_get_time() / 1000ULL;
-
-    // Calculer le vrai dt depuis la dernière frame
-    float real_dt = (now - m_last_update) / 1000.0f;
     m_last_update = now;
 
-    m_game_time += real_dt;
+    m_game_time += dt;
 
     // Vérifier victoire (30 secondes)
     if (m_game_time >= VICTORY_TIME)
@@ -130,11 +127,11 @@ void ViewGame::update(float dt)
     int infected_crops = 0;
     for (int i = 0; i < MAX_CROPS; i++)
     {
-        m_crops[i].pulse += real_dt * 3.0f;
+        m_crops[i].pulse += dt * 3.0f;
 
         if (m_crops[i].infected && m_crops[i].health > 0)
         {
-            m_crops[i].health -= (int)(real_dt * 15.0f); // Perte de santé
+            m_crops[i].health -= (int)(dt * 15.0f); // Perte de santé
             if (m_crops[i].health <= 0)
             {
                 m_crops[i].health = 0;
@@ -181,7 +178,7 @@ void ViewGame::update(float dt)
         // Appliquer le pattern de mouvement
         if (m_threats[i].movement_pattern == 1) // Sinusoïdal
         {
-            m_threats[i].phase += real_dt * 5.0f;
+            m_threats[i].phase += dt * 5.0f;
             float perpendicular_offset = sin(m_threats[i].phase) * 30.0f;
             // Calculer la direction perpendiculaire
             float dx = m_threats[i].target_x - m_threats[i].x;
@@ -191,27 +188,27 @@ void ViewGame::update(float dt)
             {
                 float perp_x = -dy / len;
                 float perp_y = dx / len;
-                m_threats[i].x += (m_threats[i].vx + perp_x * perpendicular_offset) * real_dt;
-                m_threats[i].y += (m_threats[i].vy + perp_y * perpendicular_offset) * real_dt;
+                m_threats[i].x += (m_threats[i].vx + perp_x * perpendicular_offset) * dt;
+                m_threats[i].y += (m_threats[i].vy + perp_y * perpendicular_offset) * dt;
             }
             else
             {
-                m_threats[i].x += m_threats[i].vx * real_dt;
-                m_threats[i].y += m_threats[i].vy * real_dt;
+                m_threats[i].x += m_threats[i].vx * dt;
+                m_threats[i].y += m_threats[i].vy * dt;
             }
         }
         else if (m_threats[i].movement_pattern == 2) // Circulaire/erratique
         {
-            m_threats[i].phase += real_dt * 8.0f;
+            m_threats[i].phase += dt * 8.0f;
             float wobble_x = cos(m_threats[i].phase) * 15.0f;
             float wobble_y = sin(m_threats[i].phase * 1.3f) * 15.0f;
-            m_threats[i].x += (m_threats[i].vx + wobble_x) * real_dt;
-            m_threats[i].y += (m_threats[i].vy + wobble_y) * real_dt;
+            m_threats[i].x += (m_threats[i].vx + wobble_x) * dt;
+            m_threats[i].y += (m_threats[i].vy + wobble_y) * dt;
         }
         else // Direct (pattern 0)
         {
-            m_threats[i].x += m_threats[i].vx * real_dt;
-            m_threats[i].y += m_threats[i].vy * real_dt;
+            m_threats[i].x += m_threats[i].vx * dt;
+            m_threats[i].y += m_threats[i].vy * dt;
         }
 
         // Retirer si hors écran
@@ -228,9 +225,9 @@ void ViewGame::update(float dt)
         if (!m_particles[i].active)
             continue;
 
-        m_particles[i].x += m_particles[i].vx * real_dt;
-        m_particles[i].y += m_particles[i].vy * real_dt;
-        m_particles[i].life -= real_dt;
+        m_particles[i].x += m_particles[i].vx * dt;
+        m_particles[i].y += m_particles[i].vy * dt;
+        m_particles[i].life -= dt;
 
         if (m_particles[i].life <= 0)
         {
@@ -533,9 +530,8 @@ void ViewGame::render(LGFX &display, LGFX_Sprite &spr)
         return;
     }
 
-    float dt = 0.016f; // Approximation ~60fps
-
-    update(dt);
+    // Utiliser le delta time calculé globalement par DisplayManager
+    update(m_state.dt);
 
     renderBackground(spr);
     renderCrops(spr);
