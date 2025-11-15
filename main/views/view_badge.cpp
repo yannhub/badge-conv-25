@@ -62,14 +62,24 @@ void ViewBadge::initParticles()
 
 void ViewBadge::updateAnimations(float dt)
 {
+    updateScanlineOffset(dt);
+    updateIntensityPulse(dt);
+    updateChipAnimation(dt);
+    updateParticlesAnimation(dt);
+    updateGlitchEffect(dt);
+}
 
-    // Pulsation des coins
-    m_state.corner_pulse += dt * 2.0f;
+void ViewBadge::updateIntensityPulse(float dt)
+{
+    // Pulsation commune pour tous les éléments géométriques
+    m_state.intensity_pulse += dt * 2.0f;
+    // Garder dans une plage raisonnable pour éviter les problèmes de précision float
+    if (m_state.intensity_pulse > 6.28318f * 100.0f) // 100 cycles
+        m_state.intensity_pulse -= 6.28318f * 100.0f;
+}
 
-    // Pulsation des bordures
-    m_state.border_pulse += dt * 1.5f;
-
-    // Animation du microprocesseur
+void ViewBadge::updateChipAnimation(float dt)
+{
     unsigned long now_ms = esp_timer_get_time() / 1000ULL;
 
     // Phase 1: Dessin (progress 0.0 -> 1.0)
@@ -113,8 +123,10 @@ void ViewBadge::updateAnimations(float dt)
         m_state.chip_wait_start = 0;
         m_state.chip_fade_alpha = 1.0f;
     }
+}
 
-    // Animation des particules - apparition/disparition à différents endroits + mouvement vers le haut
+void ViewBadge::updateParticlesAnimation(float dt)
+{
     unsigned long now = esp_timer_get_time() / 1000ULL;
 
     for (int i = 0; i < 12; i++)
@@ -135,8 +147,9 @@ void ViewBadge::updateAnimations(float dt)
             continue; // Passer à la particule suivante
         }
 
-        // Animer uniquement les particules actives
-        m_state.particles[i].y -= 0.4f + ((float)(i % 3)) * 0.1f; // Vitesses variées: 0.2, 0.3, 0.4 (plus lent)
+        // Animer uniquement les particules actives (utiliser dt pour un mouvement fluide)
+        float baseSpeed = 10.0f + ((float)(i % 3)) * 5.0f; // Vitesses variées: 10, 15, 20 pixels/sec
+        m_state.particles[i].y -= baseSpeed * dt;
 
         // Incrémenter la phase pour l'effet de fade in/out
         m_state.particles[i].phase += dt * m_state.particles[i].speed;
@@ -166,6 +179,11 @@ void ViewBadge::updateAnimations(float dt)
             }
         }
     }
+}
+
+void ViewBadge::updateGlitchEffect(float dt)
+{
+    unsigned long now = esp_timer_get_time() / 1000ULL;
 
     // Gestion du glitch
     if (!m_state.glitch_active && now >= m_state.glitch_next)
@@ -198,16 +216,22 @@ void ViewBadge::updateAnimations(float dt)
     }
 }
 
-void ViewBadge::updateScanlineOffset()
+void ViewBadge::updateScanlineOffset(float dt)
 {
-    // Animation fluide basée sur dt (vitesse: 15 pixels par seconde)
-    m_state.scanline_offset = fmodf(m_state.scanline_offset + m_state.dt * 15.0f, 10.0f);
+    // Animation fluide basée sur dt (vitesse: 20 pixels par seconde)
+    // Incrémenter sans limite, le modulo sera appliqué dans le rendu
+    m_state.scanline_offset += dt * 20.0f;
+
+    // Garder la valeur raisonnable pour éviter les débordements après longue durée
+    if (m_state.scanline_offset > 1000.0f)
+    {
+        m_state.scanline_offset -= 1000.0f;
+    }
 }
 
 void ViewBadge::renderBackground(LGFX_Sprite &spr)
 {
     spr.fillSprite(colBackground);
-    renderScanlines(spr);
 }
 
 void ViewBadge::renderHeader(LGFX_Sprite &spr)
@@ -249,17 +273,22 @@ void ViewBadge::renderScanlines(LGFX_Sprite &spr)
 {
     // Dessiner les scanlines avec défilement fluide
     uint16_t col = m_lcd.color565(12, 8, 30);
-    for (int y = 0; y < m_state.screenH; y += 10)
+
+    // Espacement entre les scanlines
+    const int spacing = 10;
+
+    // Calculer l'offset avec modulo pour créer un cycle continu
+    int baseOffset = (int)m_state.scanline_offset % spacing;
+
+    // Dessiner les lignes stationnaires (pas d'animation)
+    for (int y = baseOffset; y < m_state.screenH; y += spacing)
     {
-        int animY = (y + (int)m_state.scanline_offset) % m_state.screenH;
-        spr.drawFastHLine(0, animY, m_state.screenW, col);
+        spr.drawFastHLine(0, y, m_state.screenW, col);
     }
 }
 
-void ViewBadge::renderCorners(LGFX_Sprite &spr)
+void ViewBadge::renderCorners(LGFX_Sprite &spr, uint8_t intensity)
 {
-    float pulse = (sinf(m_state.corner_pulse) * 0.5f + 0.5f);
-    uint8_t intensity = (uint8_t)(100 + pulse * 155);
     uint16_t cornerColor = m_lcd.color565(intensity * 0.7, intensity * 0.8, intensity);
 
     int cornerSize = 15;
@@ -329,18 +358,21 @@ void ViewBadge::renderParticles(LGFX_Sprite &spr)
         int y = (int)m_state.particles[i].y;
         int size = (int)m_state.particles[i].size;
 
-        // Dessiner uniquement des losanges / diamants
-        spr.drawLine(x, y - size, x + size, y, particleColor);
-        spr.drawLine(x + size, y, x, y + size, particleColor);
-        spr.drawLine(x, y + size, x - size, y, particleColor);
-        spr.drawLine(x - size, y, x, y - size, particleColor);
+        // Dessiner un petit carré plein au lieu de 4 lignes (plus rapide et moins de scintillement)
+        if (size <= 1)
+        {
+            spr.drawPixel(x, y, particleColor);
+        }
+        else
+        {
+            int halfSize = size / 2;
+            spr.fillRect(x - halfSize, y - halfSize, size, size, particleColor);
+        }
     }
 }
 
-void ViewBadge::renderBorders(LGFX_Sprite &spr)
+void ViewBadge::renderBorders(LGFX_Sprite &spr, uint8_t intensity)
 {
-    float pulse = (sinf(m_state.border_pulse) * 0.3f + 0.7f);
-    uint8_t intensity = (uint8_t)(pulse * 150);
     uint16_t borderColor = m_lcd.color565(intensity * 0.9, intensity * 0.6, intensity);
 
     // Bordures fines avec effet de lueur
@@ -378,12 +410,8 @@ void ViewBadge::drawTriangle(LGFX_Sprite &spr, int cornerX, int cornerY, bool po
     }
 }
 
-void ViewBadge::renderGeometricElements(LGFX_Sprite &spr)
+void ViewBadge::renderCornerTriangles(LGFX_Sprite &spr, uint8_t intensity, uint16_t geomColor)
 {
-    float pulse = (sinf(m_state.corner_pulse * 1.3f) * 0.5f + 0.5f);
-    uint8_t intensity = (uint8_t)(80 + pulse * 80);
-    uint16_t geomColor = m_lcd.color565(intensity * 0.5, intensity, intensity * 0.8);
-
     int triSize = 8;
     int cornerOffset = 10;
 
@@ -398,39 +426,60 @@ void ViewBadge::renderGeometricElements(LGFX_Sprite &spr)
 
     // Triangle bas-droit (pointe vers haut-gauche)
     drawTriangle(spr, m_state.screenW - cornerOffset, m_state.screenH - cornerOffset, false, false, triSize, intensity, geomColor);
+}
 
-    // Lignes horizontales avec effet de vague et déploiement
+void ViewBadge::renderAnimatedLines(LGFX_Sprite &spr, uint8_t intensity, uint16_t geomColor)
+{
     int lineY1 = 40;
 
     // Animation de longueur avec effet de vague (décalage de phase entre lignes)
-    float wave1 = sinf(m_state.border_pulse * 0.5f);
-    float wave2 = sinf(m_state.border_pulse * 0.5f + 1.57f); // Décalage de 90°
+    // Vitesse augmentée pour animation plus dynamique
+    float wave1 = sinf(m_state.intensity_pulse * 0.7f);
+    float wave2 = sinf(m_state.intensity_pulse * 0.7f + 1.57f); // Décalage de 90°
 
-    int baseLen = 25;
-    int maxExtension = 20;
+    float baseLen = 30.0f;
+    float maxExtension = 15.0f;
 
     // Lignes du haut (gauche et droite avec animations opposées)
-    int lineLen1_left = baseLen + (int)(wave1 * maxExtension);
-    int lineLen1_right = baseLen + (int)(-wave1 * maxExtension);
+    float lineLen1_left = baseLen + (wave1 * maxExtension);
+    float lineLen1_right = baseLen + (-wave1 * maxExtension);
 
     // Lignes du bas (effet inversé)
-    int lineLen2_left = baseLen + (int)(wave2 * maxExtension);
-    int lineLen2_right = baseLen + (int)(-wave2 * maxExtension);
+    float lineLen2_left = baseLen + (wave2 * maxExtension);
+    float lineLen2_right = baseLen + (-wave2 * maxExtension);
 
     // Effet de double ligne pour plus de profondeur
     uint16_t geomColorDim = m_lcd.color565(intensity * 0.3, intensity * 0.6, intensity * 0.5);
 
+    // Utiliser floor() pour un arrondi cohérent vers le bas (pas de sauts de 2-3 pixels)
+    int len1_left = (int)floorf(lineLen1_left);
+    int len1_left_dim = (int)floorf(lineLen1_left * 0.7f);
+    int len1_right = (int)floorf(lineLen1_right);
+    int len1_right_dim = (int)floorf(lineLen1_right * 0.7f);
+    int len2_left = (int)floorf(lineLen2_left);
+    int len2_left_dim = (int)floorf(lineLen2_left * 0.7f);
+    int len2_right = (int)floorf(lineLen2_right);
+    int len2_right_dim = (int)floorf(lineLen2_right * 0.7f);
+
     // Lignes haut
-    spr.drawFastHLine(10, lineY1, lineLen1_left, geomColor);
-    spr.drawFastHLine(10, lineY1 + 2, lineLen1_left * 0.7f, geomColorDim);
-    spr.drawFastHLine(m_state.screenW - 10 - lineLen1_right, lineY1, lineLen1_right, geomColor);
-    spr.drawFastHLine(m_state.screenW - 10 - (int)(lineLen1_right * 0.7f), lineY1 + 2, lineLen1_right * 0.7f, geomColorDim);
+    spr.drawFastHLine(10, lineY1, len1_left, geomColor);
+    spr.drawFastHLine(10, lineY1 + 2, len1_left_dim, geomColorDim);
+    spr.drawFastHLine(m_state.screenW - 10 - len1_right, lineY1, len1_right, geomColor);
+    spr.drawFastHLine(m_state.screenW - 10 - len1_right_dim, lineY1 + 2, len1_right_dim, geomColorDim);
 
     // Lignes bas
-    spr.drawFastHLine(10, m_state.screenH - lineY1, lineLen2_left, geomColor);
-    spr.drawFastHLine(10, m_state.screenH - lineY1 - 2, lineLen2_left * 0.7f, geomColorDim);
-    spr.drawFastHLine(m_state.screenW - 10 - lineLen2_right, m_state.screenH - lineY1, lineLen2_right, geomColor);
-    spr.drawFastHLine(m_state.screenW - 10 - (int)(lineLen2_right * 0.7f), m_state.screenH - lineY1 - 2, lineLen2_right * 0.7f, geomColorDim);
+    spr.drawFastHLine(10, m_state.screenH - lineY1, len2_left, geomColor);
+    spr.drawFastHLine(10, m_state.screenH - lineY1 - 2, len2_left_dim, geomColorDim);
+    spr.drawFastHLine(m_state.screenW - 10 - len2_right, m_state.screenH - lineY1, len2_right, geomColor);
+    spr.drawFastHLine(m_state.screenW - 10 - len2_right_dim, m_state.screenH - lineY1 - 2, len2_right_dim, geomColorDim);
+}
+
+void ViewBadge::renderGeometricElements(LGFX_Sprite &spr, uint8_t intensity)
+{
+    uint16_t geomColor = m_lcd.color565(intensity * 0.5, intensity, intensity * 0.8);
+
+    renderCornerTriangles(spr, intensity, geomColor);
+    renderAnimatedLines(spr, intensity, geomColor);
 }
 
 void ViewBadge::renderMicroprocessor(LGFX_Sprite &spr)
@@ -458,7 +507,7 @@ void ViewBadge::renderMicroprocessor(LGFX_Sprite &spr)
 
     // Position centrale en bas de l'écran
     int centerX = m_state.screenW / 2;
-    int centerY = m_state.screenH - 35;
+    int centerY = m_state.screenH - 30;
     int chipWidth = 40;
     int chipHeight = 30;
     int pinLength = 12;
@@ -730,20 +779,23 @@ void ViewBadge::render(LGFX &display, LGFX_Sprite &spr)
     float dt = m_state.dt;
 
     // Mise à jour des animations
-    updateScanlineOffset();
     updateAnimations(dt);
 
+    // Calculer l'intensité commune basée sur intensity_pulse
+    float pulse = (sinf(m_state.intensity_pulse) * 0.5f + 0.5f);
+    uint8_t intensity = (uint8_t)(100 + pulse * 155);
+
     // Rendu en couches (de l'arrière vers l'avant)
-    renderBackground(spr);        // Fond sombre
-    renderScanlines(spr);         // Lignes de scan CRT
-    renderParticles(spr);         // Particules flottantes
-    renderGeometricElements(spr); // Éléments géométriques décoratifs
-    renderMicroprocessor(spr);    // Animation du microprocesseur
-    renderCorners(spr);           // Coins décoratifs
-    renderHeader(spr);            // Titre "100% G2S"
-    renderName(spr);              // Nom avec effet néon
-    renderSeparator(spr);         // Ligne de séparation
-    renderTeam(spr);              // Équipe
-    renderLocationAndRole(spr);   // Ville et poste
-    renderBorders(spr);           // Bordures pulsantes
+    renderBackground(spr);                   // Fond sombre
+    renderScanlines(spr);                    // Lignes de scan CRT
+    renderParticles(spr);                    // Particules flottantes
+    renderGeometricElements(spr, intensity); // Éléments géométriques décoratifs
+    renderBorders(spr, intensity);           // Bordures pulsantes
+    renderCorners(spr, intensity);           // Coins décoratifs
+    renderMicroprocessor(spr);               // Animation du microprocesseur
+    renderHeader(spr);                       // Titre "100% G2S"
+    renderName(spr);                         // Nom avec effet néon
+    renderSeparator(spr);                    // Ligne de séparation
+    renderTeam(spr);                         // Équipe
+    renderLocationAndRole(spr);              // Ville et poste
 }

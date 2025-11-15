@@ -13,7 +13,11 @@ public:
     void render(LGFX &display, LGFX_Sprite &spr) override;
     void initParticles();
     void updateAnimations(float dt);
-    void updateScanlineOffset();
+    void updateIntensityPulse(float dt);
+    void updateChipAnimation(float dt);
+    void updateParticlesAnimation(float dt);
+    void updateGlitchEffect(float dt);
+    void updateScanlineOffset(float dt);
     void renderBackground(LGFX_Sprite &spr);
     void renderHeader(LGFX_Sprite &spr);
     void renderName(LGFX_Sprite &spr);
@@ -22,10 +26,12 @@ public:
     void renderLocationAndRole(LGFX_Sprite &spr);
     void renderScanlines(LGFX_Sprite &spr);
     void renderNeonFullName(LGFX_Sprite &spr, const char *name1, const char *name2);
-    void renderCorners(LGFX_Sprite &spr);
+    void renderCorners(LGFX_Sprite &spr, uint8_t intensity);
     void renderParticles(LGFX_Sprite &spr);
-    void renderBorders(LGFX_Sprite &spr);
-    void renderGeometricElements(LGFX_Sprite &spr);
+    void renderBorders(LGFX_Sprite &spr, uint8_t intensity);
+    void renderGeometricElements(LGFX_Sprite &spr, uint8_t intensity);
+    void renderCornerTriangles(LGFX_Sprite &spr, uint8_t intensity, uint16_t geomColor);
+    void renderAnimatedLines(LGFX_Sprite &spr, uint8_t intensity, uint16_t geomColor);
     void renderMicroprocessor(LGFX_Sprite &spr);
 
     // Helper pour effets néon

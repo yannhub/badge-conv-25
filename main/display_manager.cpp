@@ -66,8 +66,14 @@ void DisplayManager::displayLoop()
     {
         m_views[m_currentView]->render(m_lcd, m_sprite);
     }
+
+    // Attendre que les opérations SPI précédentes soient terminées
+    m_lcd.waitDisplay();
+
     m_sprite.pushSprite(0, 0);
-    vTaskDelay(pdMS_TO_TICKS(16));
+
+    // Yield pour laisser tourner les autres tâches (notamment IDLE pour le watchdog)
+    vTaskDelay(1);
 }
 
 void DisplayManager::addView(std::unique_ptr<View> view)

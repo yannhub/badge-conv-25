@@ -27,8 +27,7 @@ public:
 
     float scanline_offset = 0.0f;
 
-    float corner_pulse = 0.0f;
-    float border_pulse = 0.0f;
+    float intensity_pulse = 0.0f;
 
     Particle particles[12];
     bool particles_initialized = false;
