@@ -7,6 +7,7 @@
 class ViewQRCode : public View
 {
 public:
+    ViewQRCode() : View(false) {}
     void render(LGFX &display, LGFX_Sprite &spr) override;
 };
 

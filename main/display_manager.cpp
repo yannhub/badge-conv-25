@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include "driver/gpio.h"
+#include <map>
 
 #define BUTTON_GPIO GPIO_NUM_0
 #define LONG_PRESS_DURATION 2000
@@ -64,16 +65,22 @@ void DisplayManager::displayLoop()
 
     if (!m_views.empty())
     {
-        m_views[m_currentView]->render(m_lcd, m_sprite);
+        auto &view = m_views[m_currentView];
+        if (!view->needsRedraw() && view->hasInitialRender())
+        {
+            // Vue statique déjà rendue, ne rien faire
+            vTaskDelay(1);
+            return;
+        }
+
+        // Sinon, rendre la vue normalement
+        view->render(m_lcd, m_sprite);
+        view->setInitialRender(true);
+        // Attendre que les opérations SPI précédentes soient terminées
+        m_lcd.waitDisplay();
+        m_sprite.pushSprite(0, 0);
+        vTaskDelay(1);
     }
-
-    // Attendre que les opérations SPI précédentes soient terminées
-    m_lcd.waitDisplay();
-
-    m_sprite.pushSprite(0, 0);
-
-    // Yield pour laisser tourner les autres tâches (notamment IDLE pour le watchdog)
-    vTaskDelay(1);
 }
 
 void DisplayManager::addView(std::unique_ptr<View> view)
@@ -86,6 +93,7 @@ void DisplayManager::nextView()
     if (m_views.empty())
         return;
     m_currentView = (m_currentView + 1) % m_views.size();
+    m_views[m_currentView]->setInitialRender(false);
 }
 
 bool DisplayManager::shouldRenderFrame()

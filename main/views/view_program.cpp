@@ -25,7 +25,7 @@ static void initColors(LGFX &display)
 }
 
 ViewProgram::ViewProgram(AppState &state, LGFX &lcd)
-    : m_state(state), m_lcd(lcd)
+    : View(false), m_state(state), m_lcd(lcd)
 {
     initColors(lcd);
 }
