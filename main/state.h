@@ -47,4 +47,9 @@ public:
     unsigned long chip_pause_start = 0;   // Début de la pause après dessin complet
     unsigned long chip_wait_start = 0;    // Début de la pause avant de redessiner
     float chip_fade_alpha = 1.0f;         // Alpha pour le fondu (1.0 = opaque, 0.0 = invisible)
+
+    // Animation du pourcentage G2S
+    float g2s_percent_anim = 0.0f; // 0.0 à 100.0, animé à l'arrivée sur l'écran
+    bool g2s_percent_anim_started = false;
+    float g2s_percent_anim_time = 0.0f; // Temps écoulé depuis le début de l'anim
 };

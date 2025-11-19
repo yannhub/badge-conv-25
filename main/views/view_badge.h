@@ -11,6 +11,8 @@ class ViewBadge : public View
 public:
     ViewBadge(AppState &state, LGFX &lcd);
     void render(LGFX &display, LGFX_Sprite &spr) override;
+    bool handleTouch(int x, int y) override;
+
     void initParticles();
     void updateAnimations(float dt);
     void updateIntensityPulse(float dt);

@@ -220,7 +220,30 @@ void ViewBadge::renderHeader(LGFX_Sprite &spr)
     spr.setTextDatum(TC_DATUM);
     spr.setTextFont(1);
     spr.setTextSize(2);
-    drawNeonText(spr, "100% G2S", m_state.screenW / 2, 20, colCyan);
+
+    // Animation du pourcentage G2S qui grimpe à l'arrivée
+    if (!m_state.g2s_percent_anim_started)
+    {
+        m_state.g2s_percent_anim = 0.0f;
+        m_state.g2s_percent_anim_time = 0.0f;
+        m_state.g2s_percent_anim_started = true;
+    }
+    // Incrémenter l'animation (vitesse : 5s pour atteindre 100%)
+    if (m_state.g2s_percent_anim < 100.0f)
+    {
+        m_state.g2s_percent_anim_time += m_state.dt;
+        float progress = m_state.g2s_percent_anim_time / 5.0f;
+        if (progress > 1.0f)
+            progress = 1.0f;
+        m_state.g2s_percent_anim = progress * 100.0f;
+    }
+
+    int percent = (int)(m_state.g2s_percent_anim + 0.5f);
+    if (percent > 100)
+        percent = 100;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d%% G2S", percent);
+    drawNeonText(spr, buf, m_state.screenW / 2, 20, colCyan);
 }
 
 void ViewBadge::renderName(LGFX_Sprite &spr)
@@ -774,9 +797,17 @@ void ViewBadge::render(LGFX &display, LGFX_Sprite &spr)
     renderBorders(spr, intensity);           // Bordures pulsantes
     renderCorners(spr, intensity);           // Coins décoratifs
     renderMicroprocessor(spr);               // Animation du microprocesseur
-    renderHeader(spr);                       // Titre "100% G2S"
+    renderHeader(spr);                       // Titre "100% G2S" animé
     renderName(spr);                         // Nom avec effet néon
     renderSeparator(spr);                    // Ligne de séparation
     renderTeam(spr);                         // Équipe
     renderLocationAndRole(spr);              // Ville et poste
+}
+
+bool ViewBadge::handleTouch(int x, int y)
+{
+    m_state.g2s_percent_anim = 0.0f;
+    m_state.g2s_percent_anim_time = 0.0f;
+    // Pas d'interaction tactile pour cette vue
+    return false;
 }
