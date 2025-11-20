@@ -16,13 +16,13 @@ struct UserInfo
 };
 
 // À personnaliser
-const UserInfo user_info = {
-    "Sergent",            // nom
-    "Yann",               // prénom
-    "open|core",          // équipe
-    "Ecully",             // ville
-    "Gardien des Pixels", // poste
-    "MDyloh2NUAa6"        // accessBadgeToken
+constexpr UserInfo user_info = {
+    "Goetz",        // nom
+    "Fran\x7fois",  // prénom
+    "open|core",    // équipe
+    "ECULLY",       // ville
+    "HERR DOKTOR",  // poste
+    "Sx5STZzB0016 " // accessBadgeToken
 };
 
 // Version QR code suffisante pour un token court (12 caractères)
