@@ -96,8 +96,10 @@ void ViewQRCode::render(LGFX &display, LGFX_Sprite &spr)
     spr.setTextSize(1);
     spr.setTextColor(TFT_WHITE);
     std::string nom_complet = user_info.prenom + std::string(" ") + user_info.nom;
-    for (auto &c : nom_complet)
-        c = toupper(c);
+    for (auto &c : nom_complet) {
+        if (c == '\x7f') c = 'C'; // cheat : \x7f added to display c cedilla
+        else c = toupper(c);
+    }
     spr.drawString(nom_complet.c_str(), spr.width() / 2, bottom_start + 10);
 
     // Ligne de séparation fine

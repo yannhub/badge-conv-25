@@ -17,12 +17,12 @@ struct UserInfo
 
 // À personnaliser
 constexpr UserInfo user_info = {
-    "Sergent",      // nom
-    "Yann",         // prénom
+    "Goetz",        // nom
+    "Fran\x7fois",  // prénom
     "open|core",    // équipe
-    "LYON",         // ville
-    "DEV FRONTEND", // poste
-    "MDyloh2NUAa6"  // accessBadgeToken
+    "ECULLY",       // ville
+    "HERR DOKTOR",  // poste
+    "Sx5STZzB0016 " // accessBadgeToken
 };
 
 // Version QR code suffisante pour un token court (12 caractères)
