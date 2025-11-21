@@ -8,6 +8,9 @@
 #include <map>
 #include "config.h"
 
+#define BUTTON_GPIO GPIO_NUM_0
+#define LONG_PRESS_DURATION 2000
+
 // Met à jour la luminosité et applique immédiatement
 void DisplayManager::updateBrightness(uint8_t value)
 {
@@ -22,16 +25,6 @@ void DisplayManager::updateAwakeTime(float minutes)
         minutes = 0.1f;
     Config::setAwakeTime(minutes);
 }
-#include "display_manager.h"
-#include "esp_log.h"
-#include <cmath>
-#include <cstdio>
-#include "driver/gpio.h"
-#include <map>
-#include "config.h"
-
-#define BUTTON_GPIO GPIO_NUM_0
-#define LONG_PRESS_DURATION 2000
 
 DisplayManager::DisplayManager(LGFX &lcd, AppState &state)
     : m_lcd(lcd), m_state(state), m_sprite(&lcd)
@@ -79,40 +72,77 @@ void DisplayManager::displayLoop()
         activity = true;
         if (!m_wasTouched)
         {
+            ESP_LOGI("DisplayManager", "Touch detected at (%d, %d)", pixel_x, pixel_y);
+            // Début du touch - sauvegarder les coordonnées
+            m_touchX = pixel_x;
+            m_touchY = pixel_y;
+            m_touchStartTime = now;
+            m_longPressTriggered = false;
+            m_wasTouched = true;
+            
             if (m_sleepMode)
             {
                 // Quitter le mode veille sans changer de vue
                 m_sleepMode = false;
                 setBacklight(Config::activeBrightness);
             }
-            else
+        }
+        else
+        {
+            // Touch maintenu - vérifier pour appui long
+            unsigned long touchDuration = now - m_touchStartTime;
+            if (!m_longPressTriggered && touchDuration > 1000 && m_settings_view)
             {
-                // Essayer de passer le touch à la vue courante
-                bool touchHandled = false;
-                if (!m_views.empty())
+                // Appui long détecté (> 1 seconde)
+                m_longPressTriggered = true;
+                if (m_currentView != m_settings_view.get())
                 {
-                    if (Config::display_rotated)
-                    {
-                        // Ajuster les coordonnées touchées si l'écran est en rotation 180°
-                        pixel_y = pixel_y + 20;
-                    }
-                    ESP_LOGI("DisplayManager", "Raw touch at (%d, %d)", raw_x, raw_y);
-                    ESP_LOGI("DisplayManager", "Touch detected at (%d, %d)", pixel_x, pixel_y);
-                    // Les coordonnées touch sont déjà dans le bon repère grâce à LovyanGFX
-                    touchHandled = m_views[m_currentView]->handleTouch(pixel_x, pixel_y);
-                }
-                // Si la vue n'a pas géré le touch, changer de vue
-                if (!touchHandled)
-                {
-                    nextView();
+                    ESP_LOGI("DisplayManager", "Long press detected - opening settings");
+                    // Aller aux réglages
+                    m_currentView = m_settings_view.get();
+                    m_currentView->setInitialRender(false);
                 }
             }
-            m_wasTouched = true;
         }
     }
     else
     {
+        // Touch relâché
+        if (m_wasTouched && !m_longPressTriggered && !m_sleepMode)
+        {
+            // C'était un clic court - traiter normalement
+            unsigned long touchDuration = now - m_touchStartTime;
+            if (touchDuration < 1000)
+            {
+                // Essayer de passer le touch à la vue courante
+                bool touchHandled = false;
+                if (m_currentView != nullptr)
+                {
+                    int touch_x = m_touchX;
+                    int touch_y = m_touchY;
+                    if (Config::display_rotated)
+                    {
+                        // Ajuster les coordonnées touchées si l'écran est en rotation 180°
+                        touch_y = touch_y + 20;
+                    }
+                    ESP_LOGI("DisplayManager", "Passing touch at (%d, %d) to current view", touch_x, touch_y);
+                    touchHandled = m_currentView->handleTouch(touch_x, touch_y);
+                }
+                // Si la vue n'a pas géré le touch, changer de vue
+                if (!touchHandled)
+                {
+                    // si clic à gauche de l'écran, vue précédente, sinon suivante
+                    if (m_currentView == m_settings_view.get())
+                        nextView(0); // Retour de la vue réglages à la vue précédente
+                    else if (m_touchX < (m_state.screenW / 2))
+                        nextView(-1);
+                    else
+                        nextView();
+                }
+            }
+        }
         m_wasTouched = false;
+        m_longPressTriggered = false;
     }
 
     // Sortie de veille si bouton pressé
@@ -127,10 +157,9 @@ void DisplayManager::displayLoop()
         setBacklight(Config::sleepBrightness);
     }
 
-    if (!m_views.empty())
+    if (m_currentView != nullptr)
     {
-        auto &view = m_views[m_currentView];
-        if (!view->needsRedraw() && view->hasInitialRender())
+        if (!m_currentView->needsRedraw() && m_currentView->hasInitialRender())
         {
             // Vue statique déjà rendue, ne rien faire
             vTaskDelay(1);
@@ -138,8 +167,8 @@ void DisplayManager::displayLoop()
         }
 
         // Sinon, rendre la vue normalement
-        view->render(m_lcd, m_sprite);
-        view->setInitialRender(true);
+        m_currentView->render(m_lcd, m_sprite);
+        m_currentView->setInitialRender(true);
         // Attendre que les opérations SPI précédentes soient terminées
         m_lcd.waitDisplay();
         m_sprite.pushSprite(0, 0);
@@ -159,14 +188,22 @@ void DisplayManager::setBacklight(uint8_t percent)
 void DisplayManager::addView(std::unique_ptr<View> view)
 {
     m_views.push_back(std::move(view));
+    if (m_currentView == nullptr)
+        m_currentView = m_views[0].get();
 }
 
-void DisplayManager::nextView()
+void DisplayManager::setSettingsView(std::unique_ptr<View> view)
+{
+    m_settings_view = std::move(view);
+}
+
+void DisplayManager::nextView(int direction)
 {
     if (m_views.empty())
         return;
-    m_currentView = (m_currentView + 1) % m_views.size();
-    m_views[m_currentView]->setInitialRender(false);
+    m_currentViewIdx = (m_currentViewIdx + direction + m_views.size()) % m_views.size();
+    m_currentView = m_views[m_currentViewIdx].get();
+    m_currentView->setInitialRender(false);
 }
 
 bool DisplayManager::shouldRenderFrame()

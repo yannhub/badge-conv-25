@@ -29,10 +29,6 @@ ViewSettings::ViewSettings(LGFX &lcd, DisplayManager &displayManager)
     this->m_stepperAwakeH = 28;
     this->m_stepperBtnW = 28;
     this->m_stepperBtnH = 28;
-
-    // Cross button (top right)
-    int crossX = (int)(lcd.width()) - 32;
-    m_crossButton = {crossX, 8, 24, 24, "X"};
 }
 
 // --- Slider générique ---
@@ -118,7 +114,7 @@ void ViewSettings::render(LGFX &display, LGFX_Sprite &spr)
 
     // Checkbox rotation écran
     int cbx = m_checkboxRotX;
-    int cby = m_checkboxRotY + 20;
+    int cby = m_checkboxRotY;
     int cbsize = 20;
     spr.drawRect(cbx, cby, cbsize, cbsize, colCyan);
     if (Config::display_rotated)
@@ -132,14 +128,6 @@ void ViewSettings::render(LGFX &display, LGFX_Sprite &spr)
     spr.setTextSize(1.0);
     spr.setTextDatum(textdatum_t::middle_left);
     spr.drawString("Tourner l'ecran 180", cbx + cbsize + 8, cby + cbsize / 2);
-
-    // Draw cross button (rectangle + X)
-    spr.drawRect(m_crossButton.x, m_crossButton.y, m_crossButton.w, m_crossButton.h, colWhite);
-    int cx = m_crossButton.x + m_crossButton.w / 2;
-    int cy = m_crossButton.y + m_crossButton.h / 2;
-    int cross_size = 12;
-    spr.drawLine(cx - cross_size / 2, cy - cross_size / 2, cx + cross_size / 2, cy + cross_size / 2, colWhite);
-    spr.drawLine(cx + cross_size / 2, cy - cross_size / 2, cx - cross_size / 2, cy + cross_size / 2, colWhite);
 
     // Réinitialiser la police à la fin du rendu
     spr.setFont(nullptr);
@@ -206,10 +194,6 @@ void ViewSettings::updateAwakeTimeStepper(bool increment)
 
 bool ViewSettings::handleTouch(int x, int y)
 {
-    // Cross button
-    if (isButtonPressed(m_crossButton, x, y))
-        return false;
-
     // Checkbox rotation
     int cbx = m_checkboxRotX;
     int cby = m_checkboxRotY + 20;

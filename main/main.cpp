@@ -68,7 +68,7 @@ extern "C" void app_main(void)
   displayManager.addView(std::make_unique<ViewProgram>(appState, lcd));
   displayManager.addView(std::make_unique<ViewGame>(appState, lcd));
   // displayManager.addView(std::make_unique<ViewBattery>(&batteryMonitor));
-  displayManager.addView(std::make_unique<ViewSettings>(lcd, displayManager));
+  displayManager.setSettingsView(std::make_unique<ViewSettings>(lcd, displayManager));
 
   // Génération du QR code de badge d'accès (après allocation des vues)
   user_info_generate_qrcode(user_info.accessBadgeToken.c_str());

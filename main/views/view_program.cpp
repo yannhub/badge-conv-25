@@ -64,6 +64,7 @@ void ViewProgram::render(LGFX &display, LGFX_Sprite &spr)
     spr.drawRect(3, 3, spr.width() - 6, spr.height() - 6, colPink);
 
     // Titre centré avec effet néon
+    spr.setTextSize(1);
     spr.setTextDatum(textdatum_t::top_center);
     spr.setFont(&fonts::Font4);
     spr.setTextColor(colPink);

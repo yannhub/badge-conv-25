@@ -37,13 +37,11 @@ private:
     int m_stepperAwakeX, m_stepperAwakeY, m_stepperAwakeW, m_stepperAwakeH;
     int m_stepperBtnW, m_stepperBtnH;
     // Checkbox rotation
-    int m_checkboxRotX = 20, m_checkboxRotY = 190, m_checkboxRotSize = 24;
+    int m_checkboxRotX = 20, m_checkboxRotY = 210, m_checkboxRotSize = 24;
     void drawSlider(LGFX_Sprite &spr, int x, int y, int w, int h, int colorFill, int colorGlow, int colorLabel, int colorValue, float value, float min, float max, const char *valueFormat, const char *label, int valueInt = -1);
     void updateBrightnessFromTouch(int x);
     void updateSleepBrightnessFromTouch(int x);
     void updateAwakeTimeStepper(bool increment);
-    // Cross button
-    Button m_crossButton;
     void toggleRotation();
 };
 
